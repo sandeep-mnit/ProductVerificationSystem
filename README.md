@@ -10,7 +10,7 @@
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/ProductVerificationSystem.git
+git clone https://github.com/sandeep-mnit/ProductVerificationSystem.git
 cd ProductVerificationSystem
 ```
 
