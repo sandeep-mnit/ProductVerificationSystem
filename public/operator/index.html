@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0">
+  <title>PVS — Verify Product</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#f1f5f9;min-height:100vh}
+    header{background:#1e293b;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #334155}
+    header h1{font-size:15px;font-weight:600;color:#f1f5f9}
+    header a{font-size:12px;color:#94a3b8;text-decoration:none}
+    .page{padding:20px;max-width:480px;margin:0 auto}
+    .scan-card{background:#1e293b;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid #334155}
+    .scan-card label{display:block;font-size:12px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px}
+    .wid-input{width:100%;background:#0f172a;border:2px solid #334155;border-radius:10px;padding:14px 16px;font-size:20px;font-weight:600;color:#f1f5f9;outline:none;letter-spacing:1px}
+    .wid-input:focus{border-color:#6366f1}
+    .wid-input::placeholder{color:#475569;font-weight:400;font-size:16px}
+    .btn-lookup{width:100%;margin-top:12px;padding:14px;background:#6366f1;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s}
+    .btn-lookup:hover{background:#4f46e5}
+    .btn-lookup:active{background:#4338ca}
+    .result-card{background:#1e293b;border-radius:16px;padding:24px;margin-bottom:20px;border:1px solid #334155;display:none}
+    .result-card h3{font-size:14px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+    .field-row{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid #0f172a}
+    .field-row:last-child{border:none}
+    .field-label{font-size:13px;color:#64748b}
+    .field-value{font-size:15px;font-weight:600;color:#f1f5f9;text-align:right}
+    .expired-tag{background:#7f1d1d;color:#fca5a5;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-left:8px}
+    .ok-tag{background:#14532d;color:#86efac;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;margin-left:8px}
+    .submit-card{background:#1e293b;border-radius:16px;padding:24px;border:1px solid #334155;display:none}
+    .submit-card h3{font-size:14px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+    .photo-area{background:#0f172a;border:2px dashed #334155;border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-bottom:12px}
+    .photo-area p{font-size:14px;color:#64748b}
+    .photo-area small{font-size:12px;color:#475569}
+    #photoInput{display:none}
+    #photoPreview{width:100%;border-radius:10px;margin-top:12px;display:none}
+    textarea{width:100%;background:#0f172a;border:1.5px solid #334155;border-radius:10px;padding:12px;color:#f1f5f9;font-size:14px;resize:none;outline:none;margin-bottom:12px;font-family:inherit}
+    textarea:focus{border-color:#6366f1}
+    .btn-submit{width:100%;padding:14px;background:#10b981;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer}
+    .btn-submit:hover{background:#059669}
+    .btn-submit:disabled{background:#1e3a2f;color:#4b7a65;cursor:not-allowed}
+    .success-msg{background:#022c22;border:1px solid #10b981;border-radius:10px;padding:16px;text-align:center;display:none;margin-top:12px}
+    .success-msg p{color:#34d399;font-size:15px;font-weight:600}
+    .success-msg small{color:#6ee7b7;font-size:12px}
+    .error-msg{background:#450a0a;border:1px solid #ef4444;border-radius:10px;padding:14px;color:#fca5a5;font-size:14px;display:none;margin-top:12px}
+    .btn-reset{width:100%;margin-top:12px;padding:12px;background:transparent;color:#94a3b8;border:1px solid #334155;border-radius:10px;font-size:14px;cursor:pointer}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Product Verification</h1>
+  <a href="/logout">Sign out</a>
+</header>
+
+<div class="page">
+
+  <!-- Step 1: WID Input -->
+  <div class="scan-card">
+    <label>Scan or enter Warehouse ID (WID)</label>
+    <input type="text" class="wid-input" id="widInput" placeholder="e.g. WH-001234" autocomplete="off" autocapitalize="characters">
+    <button class="btn-lookup" id="lookupBtn" onclick="lookupWID()">Look Up Product</button>
+  </div>
+
+  <!-- Step 2: Product Details -->
+  <div class="result-card" id="resultCard">
+    <h3>Product Details</h3>
+    <div class="field-row">
+      <span class="field-label">WID</span>
+      <span class="field-value" id="resWid">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">EAN / Barcode</span>
+      <span class="field-value" id="resEan">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Manufacturing date</span>
+      <span class="field-value" id="resMfg">—</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Expiry date</span>
+      <span class="field-value" id="resExp">—</span>
+    </div>
+  </div>
+
+  <!-- Step 3: Submit Verification -->
+  <div class="submit-card" id="submitCard">
+    <h3>Log Verification</h3>
+
+    <div class="photo-area" onclick="document.getElementById('photoInput').click()">
+      <p>&#128247; Tap to take a photo of the product</p>
+      <small>Optional — helps QA audit</small>
+    </div>
+    <input type="file" id="photoInput" accept="image/*" capture="environment">
+    <img id="photoPreview">
+
+    <textarea id="notesInput" rows="2" placeholder="Notes (optional) — e.g. 'label damaged' or 'ok'"></textarea>
+
+    <button class="btn-submit" id="submitBtn" onclick="submitVerification()">
+      Confirm &amp; Log Verification
+    </button>
+
+    <div class="success-msg" id="successMsg">
+      <p>&#10003; Verification logged</p>
+      <small id="logIdText"></small>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <button class="btn-reset" onclick="resetForm()">Verify another product</button>
+  </div>
+
+</div>
+
+<script>
+let currentWid = null;
+
+document.getElementById('widInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') lookupWID();
+});
+
+document.getElementById('photoInput').onchange = function() {
+  const file = this.files[0];
+  if (!file) return;
+  const preview = document.getElementById('photoPreview');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+};
+
+async function lookupWID() {
+  const wid = document.getElementById('widInput').value.trim();
+  if (!wid) return;
+
+  const btn = document.getElementById('lookupBtn');
+  btn.textContent = 'Looking up...'; btn.disabled = true;
+
+  try {
+    const res  = await fetch('/operator/lookup/' + encodeURIComponent(wid));
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || 'WID not found');
+      btn.textContent = 'Look Up Product'; btn.disabled = false;
+      return;
+    }
+
+    currentWid = data.wid;
+    document.getElementById('resWid').textContent = data.wid;
+    document.getElementById('resEan').textContent = data.ean;
+    document.getElementById('resMfg').textContent = data.manufacturing_date;
+
+    const expEl = document.getElementById('resExp');
+    const tag = data.is_expired
+      ? '<span class="expired-tag">EXPIRED</span>'
+      : '<span class="ok-tag">VALID</span>';
+    expEl.innerHTML = data.expiry_date + tag;
+
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('submitCard').style.display = 'block';
+    document.getElementById('successMsg').style.display = 'none';
+    document.getElementById('errorMsg').style.display = 'none';
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = 'Confirm & Log Verification';
+
+  } catch(e) {
+    alert('Network error: ' + e.message);
+  }
+
+  btn.textContent = 'Look Up Product'; btn.disabled = false;
+}
+
+async function submitVerification() {
+  if (!currentWid) return;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Logging...';
+
+  const form = new FormData();
+  form.append('wid', currentWid);
+  form.append('notes', document.getElementById('notesInput').value);
+  const photo = document.getElementById('photoInput').files[0];
+  if (photo) form.append('photo', photo);
+
+  try {
+    const res  = await fetch('/operator/verify', { method:'POST', body:form });
+    const data = await res.json();
+
+    if (!res.ok) throw new Error(data.error || 'Verification failed');
+
+    document.getElementById('successMsg').style.display = 'block';
+    document.getElementById('logIdText').textContent = 'Log ID: ' + data.logId;
+    document.getElementById('errorMsg').style.display = 'none';
+    btn.textContent = 'Logged!';
+
+  } catch(e) {
+    document.getElementById('errorMsg').textContent = 'Error: ' + e.message;
+    document.getElementById('errorMsg').style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Confirm & Log Verification';
+  }
+}
+
+function resetForm() {
+  currentWid = null;
+  document.getElementById('widInput').value = '';
+  document.getElementById('resultCard').style.display = 'none';
+  document.getElementById('submitCard').style.display = 'none';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoInput').value = '';
+  document.getElementById('notesInput').value = '';
+  document.getElementById('successMsg').style.display = 'none';
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('widInput').focus();
+}
+</script>
+</body>
+</html>

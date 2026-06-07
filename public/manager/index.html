@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>PVS — Manager Dashboard</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fb;color:#1a1a2e}
+    header{background:#1a1a2e;color:#fff;padding:0 32px;height:56px;display:flex;align-items:center;justify-content:space-between}
+    header h1{font-size:16px;font-weight:600}
+    header a{color:#aaa;font-size:13px;text-decoration:none;margin-left:16px}
+    header a:hover{color:#fff}
+    .main{max-width:900px;margin:40px auto;padding:0 24px}
+    h2{font-size:20px;font-weight:600;margin-bottom:6px}
+    .sub{font-size:14px;color:#666;margin-bottom:28px}
+    .card{background:#fff;border-radius:12px;border:1px solid #eee;padding:28px;margin-bottom:24px}
+    .card h3{font-size:15px;font-weight:600;margin-bottom:16px;color:#333}
+    .drop-zone{border:2px dashed #d1d5db;border-radius:10px;padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s}
+    .drop-zone:hover,.drop-zone.drag{border-color:#4f46e5;background:#f5f3ff}
+    .drop-zone .icon{font-size:36px;margin-bottom:12px}
+    .drop-zone p{font-size:14px;color:#555}
+    .drop-zone small{color:#888;font-size:12px}
+    #fileInput{display:none}
+    .file-row{margin-top:16px;display:none;gap:12px;align-items:center}
+    .btn{display:inline-block;padding:10px 22px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer}
+    .btn:hover{background:#4338ca}
+    .btn:disabled{background:#9ca3af;cursor:not-allowed}
+    .progress-wrap{margin-top:20px;display:none}
+    .bar-bg{background:#e5e7eb;border-radius:99px;height:10px;overflow:hidden;margin:8px 0}
+    .bar{height:100%;background:#4f46e5;border-radius:99px;width:0%;transition:width .4s}
+    .status-text{font-size:13px;color:#555;margin-top:6px}
+    .badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:500}
+    .badge-done{background:#d1fae5;color:#065f46}
+    .badge-processing{background:#dbeafe;color:#1e40af}
+    .badge-pending{background:#fef9c3;color:#854d0e}
+    .badge-failed{background:#fee2e2;color:#991b1b}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;color:#888;font-weight:500;padding:8px 12px;border-bottom:1px solid #f0f0f0}
+    td{padding:10px 12px;border-bottom:1px solid #f7f7f7;color:#333}
+    tr:last-child td{border:none}
+    .empty{text-align:center;padding:32px;color:#aaa;font-size:14px}
+    .err-list{margin-top:12px;background:#fef2f2;border-radius:8px;padding:12px 16px;font-size:12px;color:#991b1b;max-height:160px;overflow-y:auto;display:none}
+    .err-list li{margin-bottom:4px;list-style:disc;margin-left:16px}
+    .sample{background:#f8f9fb;border-radius:8px;padding:12px 16px;font-size:12px;font-family:monospace;color:#555;margin-top:12px;line-height:1.7}
+  </style>
+</head>
+<body>
+<header>
+  <h1>PVS — Warehouse Manager Dashboard</h1>
+  <div><a href="/logout">Sign out</a></div>
+</header>
+
+<div class="main">
+  <h2>Upload Product Data</h2>
+  <p class="sub">Import product records from a CSV file. Large files (millions of rows) are processed in the background — you can close this page and come back.</p>
+
+  <div class="card">
+    <h3>CSV File Upload</h3>
+    <div class="drop-zone" id="dropZone">
+      <div class="icon">&#128194;</div>
+      <p>Drag &amp; drop your CSV file here, or <strong>click to browse</strong></p>
+      <small>Required columns: WID, EAN, Manufacturing_Date, Expiry_Date</small>
+    </div>
+    <input type="file" id="fileInput" accept=".csv">
+
+    <div class="file-row" id="fileRow">
+      <span id="fileName" style="font-size:14px;color:#333;flex:1"></span>
+      <button class="btn" id="uploadBtn">Upload &amp; Process</button>
+    </div>
+
+    <div class="progress-wrap" id="progressWrap">
+      <div class="bar-bg"><div class="bar" id="progressBar"></div></div>
+      <div class="status-text" id="statusText">Starting...</div>
+      <ul class="err-list" id="errList"></ul>
+    </div>
+
+    <div class="sample">
+      <strong>Sample CSV format:</strong><br>
+      WID,EAN,Manufacturing_Date,Expiry_Date<br>
+      WH-001,5901234123457,2024-01-15,2026-01-15<br>
+      WH-002,5901234123457,2024-02-01,2026-02-01<br>
+      WH-003,4006381333931,2023-11-10,2025-11-10
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Upload History</h3>
+    <div id="jobsTable"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
+<script>
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileRow   = document.getElementById('fileRow');
+const fileName  = document.getElementById('fileName');
+const uploadBtn = document.getElementById('uploadBtn');
+const progWrap  = document.getElementById('progressWrap');
+const progBar   = document.getElementById('progressBar');
+const statusTxt = document.getElementById('statusText');
+const errList   = document.getElementById('errList');
+
+let selectedFile = null;
+let pollInterval = null;
+
+dropZone.onclick = () => fileInput.click();
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.csv')) setFile(f);
+  else alert('Please drop a .csv file');
+});
+fileInput.onchange = () => { if (fileInput.files[0]) setFile(fileInput.files[0]); };
+
+function setFile(f) {
+  selectedFile = f;
+  fileName.textContent = f.name + '  (' + (f.size/1024/1024).toFixed(2) + ' MB)';
+  fileRow.style.display = 'flex';
+}
+
+uploadBtn.onclick = async () => {
+  if (!selectedFile) return;
+  uploadBtn.disabled = true;
+  progWrap.style.display = 'block';
+  errList.style.display = 'none'; errList.innerHTML = '';
+  statusTxt.textContent = 'Uploading file...';
+  progBar.style.width = '5%';
+
+  const form = new FormData();
+  form.append('csvfile', selectedFile);
+  try {
+    const res  = await fetch('/manager/upload', { method:'POST', body:form });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+    statusTxt.textContent = 'Processing... (Job: ' + data.jobId.slice(0,8) + '...)';
+    pollJob(data.jobId);
+  } catch(e) {
+    statusTxt.textContent = 'Error: ' + e.message;
+    uploadBtn.disabled = false;
+  }
+};
+
+function pollJob(jobId) {
+  clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    const res = await fetch('/manager/job/' + jobId);
+    const job = await res.json();
+    const pct = job.total_rows > 0 ? Math.min(99, Math.round(job.processed / job.total_rows * 100)) : 15;
+    progBar.style.width = pct + '%';
+
+    if (job.status === 'done') {
+      clearInterval(pollInterval);
+      progBar.style.width = '100%';
+      statusTxt.textContent = 'Done! ' + job.processed.toLocaleString() + ' rows imported. ' + job.errors + ' errors.';
+      loadJobs();
+      if (job.error_log && job.error_log.length > 0) {
+        errList.style.display = 'block';
+        errList.innerHTML = job.error_log.slice(0,20).map(e => '<li>Row ' + (e.row||'?') + ': ' + e.error + '</li>').join('');
+      }
+    } else if (job.status === 'failed') {
+      clearInterval(pollInterval);
+      statusTxt.textContent = 'Processing failed.';
+    } else {
+      statusTxt.textContent = 'Processing: ' + job.processed.toLocaleString() + ' rows done, ' + job.errors + ' errors so far...';
+    }
+  }, 1500);
+}
+
+async function loadJobs() {
+  const res  = await fetch('/manager/jobs');
+  const jobs = await res.json();
+  const el   = document.getElementById('jobsTable');
+  if (!jobs.length) { el.innerHTML = '<div class="empty">No uploads yet.</div>'; return; }
+  el.innerHTML = '<table><thead><tr><th>File</th><th>Status</th><th>Rows imported</th><th>Errors</th><th>Started</th></tr></thead><tbody>' +
+    jobs.map(j => '<tr><td>' + j.filename + '</td><td><span class="badge badge-' + j.status + '">' + j.status + '</span></td><td>' + j.processed.toLocaleString() + ' / ' + j.total_rows.toLocaleString() + '</td><td>' + j.errors + '</td><td>' + new Date(j.started_at).toLocaleString() + '</td></tr>').join('') +
+    '</tbody></table>';
+}
+
+loadJobs();
+</script>
+</body>
+</html>

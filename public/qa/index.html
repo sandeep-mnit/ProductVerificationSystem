@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>PVS — QA Reports</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f9fb;color:#1a1a2e}
+    header{background:#0f766e;color:#fff;padding:0 32px;height:56px;display:flex;align-items:center;justify-content:space-between}
+    header h1{font-size:16px;font-weight:600}
+    header a{color:rgba(255,255,255,.7);font-size:13px;text-decoration:none}
+    header a:hover{color:#fff}
+    .main{max-width:1100px;margin:32px auto;padding:0 24px}
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+    .stat-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:20px 24px}
+    .stat-card .num{font-size:28px;font-weight:700;color:#0f766e;margin-bottom:4px}
+    .stat-card .lbl{font-size:12px;color:#6b7280;font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+    .stat-card.warn .num{color:#b45309}
+    .card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:24px;margin-bottom:24px}
+    .card h3{font-size:15px;font-weight:600;margin-bottom:16px;color:#333}
+    .filter-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px}
+    .filter-row label{display:block;font-size:12px;font-weight:500;color:#6b7280;margin-bottom:5px}
+    .filter-row input{padding:9px 12px;border:1.5px solid #d1d5db;border-radius:8px;font-size:14px;outline:none;color:#111}
+    .filter-row input:focus{border-color:#0f766e}
+    .btn{padding:9px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer}
+    .btn:hover{background:#0d6660}
+    .btn-outline{background:transparent;color:#0f766e;border:1.5px solid #0f766e}
+    .btn-outline:hover{background:#f0fdf9}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{text-align:left;color:#9ca3af;font-weight:500;padding:8px 12px;border-bottom:2px solid #f3f4f6}
+    td{padding:11px 12px;border-bottom:1px solid #f9fafb;color:#374151;vertical-align:middle}
+    tr:hover td{background:#f0fdf9}
+    .badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+    .badge-valid{background:#dcfce7;color:#14532d}
+    .badge-expired{background:#fee2e2;color:#7f1d1d}
+    .empty{text-align:center;padding:48px;color:#9ca3af;font-size:14px}
+    .pagination{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:16px;font-size:13px;color:#6b7280}
+    .page-btn{padding:5px 11px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:13px}
+    .page-btn:hover{background:#f3f4f6}
+    .page-btn:disabled{opacity:.4;cursor:not-allowed}
+    .photo-link{color:#0f766e;text-decoration:none;font-size:12px}
+    .photo-link:hover{text-decoration:underline}
+    @media(max-width:700px){.stats-row{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>PVS — Quality Assurance Dashboard</h1>
+  <a href="/logout">Sign out</a>
+</header>
+
+<div class="main">
+
+  <!-- Stats row -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="num" id="sTotalProducts">—</div><div class="lbl">Total products</div></div>
+    <div class="stat-card"><div class="num" id="sTotalVer">—</div><div class="lbl">Total verifications</div></div>
+    <div class="stat-card"><div class="num" id="sToday">—</div><div class="lbl">Verified today</div></div>
+    <div class="stat-card warn"><div class="num" id="sExpired">—</div><div class="lbl">Expired products</div></div>
+  </div>
+
+  <!-- Report filter -->
+  <div class="card">
+    <h3>Verification Report</h3>
+    <div class="filter-row">
+      <div>
+        <label>From date</label>
+        <input type="date" id="fromDate">
+      </div>
+      <div>
+        <label>To date</label>
+        <input type="date" id="toDate">
+      </div>
+      <button class="btn" onclick="runReport(1)">Generate Report</button>
+      <button class="btn btn-outline" id="exportBtn" onclick="exportCSV()" style="display:none">Export CSV</button>
+    </div>
+
+    <div id="reportArea">
+      <div class="empty">Select a date range and click Generate Report.</div>
+    </div>
+
+    <div class="pagination" id="pagination" style="display:none">
+      <button class="page-btn" id="prevBtn" onclick="changePage(-1)" disabled>&#8592; Prev</button>
+      <span id="pageInfo"></span>
+      <button class="page-btn" id="nextBtn" onclick="changePage(1)">Next &#8594;</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let currentPage  = 1;
+let totalPages   = 1;
+
+// Default date range: last 30 days
+const today = new Date();
+const past  = new Date(today); past.setDate(past.getDate() - 30);
+document.getElementById('toDate').value   = today.toISOString().slice(0,10);
+document.getElementById('fromDate').value = past.toISOString().slice(0,10);
+
+async function loadStats() {
+  const res   = await fetch('/qa/stats');
+  const stats = await res.json();
+  document.getElementById('sTotalProducts').textContent = stats.total_products.toLocaleString();
+  document.getElementById('sTotalVer').textContent      = stats.total_verifications.toLocaleString();
+  document.getElementById('sToday').textContent         = stats.verifications_today.toLocaleString();
+  document.getElementById('sExpired').textContent       = stats.expired_products.toLocaleString();
+}
+
+async function runReport(page) {
+  currentPage = page || 1;
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  if (!from || !to) { alert('Please select both dates'); return; }
+
+  document.getElementById('reportArea').innerHTML = '<div class="empty">Loading...</div>';
+  document.getElementById('pagination').style.display = 'none';
+  document.getElementById('exportBtn').style.display  = 'none';
+
+  const res  = await fetch('/qa/report?from=' + from + '&to=' + to + '&page=' + currentPage + '&limit=50');
+  const data = await res.json();
+
+  if (!res.ok) { document.getElementById('reportArea').innerHTML = '<div class="empty">Error: ' + data.error + '</div>'; return; }
+
+  totalPages = data.pages || 1;
+
+  if (!data.rows || data.rows.length === 0) {
+    document.getElementById('reportArea').innerHTML = '<div class="empty">No verifications in this date range.</div>';
+    return;
+  }
+
+  document.getElementById('exportBtn').style.display = 'inline-block';
+
+  let html = '<table><thead><tr>'
+    + '<th>WID</th><th>EAN</th><th>Expiry date</th><th>Status</th>'
+    + '<th>Operator</th><th>Verified at</th><th>Notes</th><th>Photo</th>'
+    + '</tr></thead><tbody>';
+
+  data.rows.forEach(r => {
+    const statusBadge = r.is_expired
+      ? '<span class="badge badge-expired">Expired</span>'
+      : '<span class="badge badge-valid">Valid</span>';
+    const photoCell = r.photo_path
+      ? '<a class="photo-link" href="' + r.photo_path + '" target="_blank">View</a>'
+      : '<span style="color:#d1d5db">—</span>';
+    html += '<tr>'
+      + '<td style="font-family:monospace;font-weight:600">' + r.wid + '</td>'
+      + '<td>' + r.ean + '</td>'
+      + '<td>' + r.expiry_date + '</td>'
+      + '<td>' + statusBadge + '</td>'
+      + '<td>' + r.operator_name + '</td>'
+      + '<td>' + new Date(r.checked_at).toLocaleString() + '</td>'
+      + '<td style="color:#6b7280;max-width:180px">' + (r.notes || '—') + '</td>'
+      + '<td>' + photoCell + '</td>'
+      + '</tr>';
+  });
+
+  html += '</tbody></table>';
+  html += '<div style="margin-top:12px;font-size:12px;color:#9ca3af">'
+    + data.total.toLocaleString() + ' verifications found in range</div>';
+
+  document.getElementById('reportArea').innerHTML = html;
+
+  if (totalPages > 1) {
+    document.getElementById('pagination').style.display = 'flex';
+    document.getElementById('pageInfo').textContent = 'Page ' + currentPage + ' of ' + totalPages;
+    document.getElementById('prevBtn').disabled = currentPage <= 1;
+    document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+  }
+}
+
+function changePage(delta) {
+  const next = currentPage + delta;
+  if (next < 1 || next > totalPages) return;
+  runReport(next);
+}
+
+function exportCSV() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  if (!from || !to) { alert('Select dates first'); return; }
+  window.location.href = '/qa/report/export?from=' + from + '&to=' + to;
+}
+
+loadStats();
+</script>
+</body>
+</html>
