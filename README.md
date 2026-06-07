@@ -5,16 +5,22 @@
 - Node.js 18+ (https://nodejs.org)
 - npm
 
-## Quick Start (3 steps)
+## Clone & Run (4 steps)
 
-### 1. Install dependencies
+### 1. Clone the repository
 
 ```bash
+git clone https://github.com/yourusername/ProductVerificationSystem.git
 cd ProductVerificationSystem
+```
+
+### 2. Install dependencies
+
+```bash
 npm install
 ```
 
-### 2. Start the server
+### 3. Start the server
 
 ```bash
 npm start
@@ -22,9 +28,11 @@ npm start
 npm run dev
 ```
 
-### 3. Open the app
+### 4. Open the app
 
 Visit http://localhost:3000
+
+> The database (`pvs.db`) and `uploads/photos/` folder are created automatically on first run — no manual setup needed.
 
 ---
 
@@ -45,20 +53,24 @@ Sessions expire after **8 hours** of inactivity.
 ## CSV Format for Upload
 
 ```csv
-WID,EAN,Manufacturing_Date,Expiry_Date
-WH-001,5901234123457,2024-01-15,2026-01-15
-WH-002,5901234123457,2024-02-01,2026-02-01
-WH-003,4006381333931,2023-11-10,2025-11-10
+WID	EAN	Manufacturing_Date	Expiry_Date
+18739945	8.43E+12	########	########
+76786340	4.57E+12	9/2/2025	########
+22585362	3.80E+12	########	########
+39767202	7.04E+12	5/2/2024	########
+43075547	2.28E+12	7/9/2024	4/9/2026
 ```
 
 **Column rules:**
 
 - `WID` — unique per physical item (primary key)
 - `EAN` — product barcode (multiple WIDs can share an EAN)
-- `Manufacturing_Date` — recommended format: YYYY-MM-DD
-- `Expiry_Date` — recommended format: YYYY-MM-DD
+- `Manufacturing_Date` — recommended format: DD-MM-YYYY
+- `Expiry_Date` — recommended format: DD-MM-YYYY
 
 > **Excel users:** Before exporting as CSV, widen date columns so they show actual dates (not `########`) and format EAN columns as **Text** (not Number) to prevent scientific notation like `8.43E+12`.
+
+Sample CSV files for demo are included in the repository root.
 
 ---
 
@@ -66,25 +78,27 @@ WH-003,4006381333931,2023-11-10,2025-11-10
 
 ```
 ProductVerificationSystem/
-    ├── server.js              # Express entry point
-    ├── package.json
-    ├── db/
-    │   ├── database.js        # sql.js setup, schema creation + seed users
-    │   └── pvs.db             # SQLite database (auto-created on first run)
-    ├── middleware/
-    │   └── auth.js            # Session auth + role guard
-    ├── routes/
-    │   ├── auth.js            # Login / logout / dashboard redirect
-    │   ├── manager.js         # CSV upload + background job polling
-    │   ├── operator.js        # WID lookup + verification logging + photo upload
-    │   └── qa.js              # Report generation + CSV export + stats
-    ├── public/
-    │   ├── login.html         # Shared login page
-    │   ├── manager/index.html # Manager upload dashboard
-    │   ├── operator/index.html# Operator verification page (mobile-optimised)
-    │   └── qa/index.html      # QA reporting dashboard
-    └── uploads/
-        └── photos/            # Product photos captured during verification
+├── server.js              # Express entry point
+├── package.json
+├── .gitignore
+├── README.md
+├── db/
+│   └── database.js        # sql.js setup, schema creation + seed users
+│   └── pvs.db             # Auto-created on first run (not in repo)
+├── middleware/
+│   └── auth.js            # Session auth + role guard
+├── routes/
+│   ├── auth.js            # Login / logout / dashboard redirect
+│   ├── manager.js         # CSV upload + background job polling
+│   ├── operator.js        # WID lookup + verification logging + photo upload
+│   └── qa.js              # Report generation + CSV export + stats
+├── public/
+│   ├── login.html         # Shared login page
+│   ├── manager/index.html # Manager upload dashboard
+│   ├── operator/index.html# Operator verification page (mobile-optimised)
+│   └── qa/index.html      # QA reporting dashboard
+└── uploads/
+    └── photos/            # Auto-created on first run (not in repo)
 ```
 
 ---
@@ -137,24 +151,13 @@ SESSION_SECRET=your-secret # Change this in production!
 
 ---
 
-## Production Checklist
-
-- [ ] Set `SESSION_SECRET` to a long random string
-- [ ] Set `cookie.secure = true` in `server.js` (requires HTTPS)
-- [ ] Add HTTPS via nginx or a reverse proxy
-- [ ] Migrate from sql.js to PostgreSQL for multi-server deployments
-- [ ] Move photo uploads from local disk to S3 / object storage
-- [ ] Remove or protect debug routes (`/debug/users`, `/debug/products`, `/debug/login-test`)
-
----
-
 ## Production Upgrade Path
 
 The current stack uses **sql.js** (an in-memory SQLite engine) which persists to a single `.db` file. This is ideal for a single-server deployment.
 
 For multi-server or high-concurrency production use:
 
-- Replace `sql.js` with **PostgreSQL** using the `pg` package
-- The DB wrapper in `db/database.js` abstracts all queries — only that file needs to change
-- All SQL is standard and compatible with PostgreSQL with minimal changes
-- Photo storage: swap `multer.diskStorage` in `routes/operator.js` for `multer-s3` and update `photo_path` to store the S3 URL instead of a local path
+- Replace `sql.js` with **PostgreSQL** using the `pg` package — the DB wrapper in `db/database.js` abstracts all queries, so only that file needs to change
+- Swap `multer.diskStorage` in `routes/operator.js` for `multer-s3` and store the S3 URL in `photo_path` instead of a local path
+- Set `cookie.secure = true` and serve over HTTPS via nginx or a reverse proxy
+- Remove or protect debug routes (`/debug/users`, `/debug/products`, `/debug/login-test`)
